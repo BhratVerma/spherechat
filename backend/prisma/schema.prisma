@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  username      String   @unique
+  trustScore    Float    @default(50.0)
+  totalChats    Int      @default(0)
+  flagCount     Int      @default(0)
+  isBanned      Boolean  @default(false)
+  interests     String[] @default([])
+  preferredLang String   @default("en")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  roomsAsUser1 Room[]    @relation("User1Rooms")
+  roomsAsUser2 Room[]    @relation("User2Rooms")
+  messages     Message[]
+  ratingsGiven Rating[]  @relation("RatingsGiven")
+  ratingsRecvd Rating[]  @relation("RatingsReceived")
+  friends      Friend[]  @relation("FriendUser")
+  friendOf     Friend[]  @relation("FriendTarget")
+}
+
+model OTP {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Room {
+  id        String     @id @default(cuid())
+  mode      RoomMode   @default(TALK)
+  status    RoomStatus @default(ACTIVE)
+  user1Id   String
+  user2Id   String?
+  topic     String?
+  createdAt DateTime   @default(now())
+  endedAt   DateTime?
+
+  user1    User      @relation("User1Rooms", fields: [user1Id], references: [id])
+  user2    User?     @relation("User2Rooms", fields: [user2Id], references: [id])
+  messages Message[]
+  ratings  Rating[]
+}
+
+model Message {
+  id            String           @id @default(cuid())
+  roomId        String
+  senderId      String
+  content       String
+  translated    String?
+  modStatus     ModerationStatus @default(PENDING)
+  modVerdict    String?
+  modConfidence Float?
+  createdAt     DateTime         @default(now())
+
+  room   Room @relation(fields: [roomId], references: [id])
+  sender User @relation(fields: [senderId], references: [id])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  roomId    String
+  raterId   String
+  ratedId   String
+  score     Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  room  Room @relation(fields: [roomId], references: [id])
+  rater User @relation("RatingsGiven", fields: [raterId], references: [id])
+  rated User @relation("RatingsReceived", fields: [ratedId], references: [id])
+}
+
+model Friend {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  createdAt DateTime @default(now())
+
+  user   User @relation("FriendUser", fields: [userId], references: [id])
+  target User @relation("FriendTarget", fields: [targetId], references: [id])
+
+  @@unique([userId, targetId])
+}
+
+enum RoomMode {
+  TALK
+  DEBATE
+  LANGUAGE
+  GAME
+}
+
+enum RoomStatus {
+  ACTIVE
+  ENDED
+}
+
+enum ModerationStatus {
+  PENDING
+  SAFE
+  WARNING
+  TOXIC
+}
