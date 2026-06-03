@@ -35,7 +35,7 @@ router.get('/:roomId', async (req: Request, res: Response) => {
   }
 })
 
-// POST /api/room/:roomId/rate  — rate the other user after chat
+// POST /api/room/:roomId/rate
 router.post('/:roomId/rate', async (req: Request, res: Response) => {
   try {
     const { roomId } = req.params
@@ -43,7 +43,7 @@ router.post('/:roomId/rate', async (req: Request, res: Response) => {
     const { score, comment } = req.body
 
     if (!score || score < 1 || score > 5) {
-      return res.status(400).json({ error: 'Score must be 1–5' })
+      return res.status(400).json({ error: 'Score must be 1-5' })
     }
 
     const room = await prisma.room.findUnique({ where: { id: roomId } })
@@ -56,10 +56,16 @@ router.post('/:roomId/rate', async (req: Request, res: Response) => {
       data: { roomId, raterId: userId, ratedId, score, comment },
     })
 
-    // Recalculate trust score
-    const ratings = await prisma.rating.findMany({ where: { ratedId }, select: { score: true } })
+    const ratings = await prisma.rating.findMany({
+      where: { ratedId },
+      select: { score: true },
+    })
+
     const avg = ratings.reduce((s, r) => s + r.score, 0) / ratings.length
-    await prisma.user.update({ where: { id: ratedId }, data: { trustScore: (avg / 5) * 100 } })
+    await prisma.user.update({
+      where: { id: ratedId },
+      data: { trustScore: (avg / 5) * 100 },
+    })
 
     res.json({ success: true })
   } catch (err) {
