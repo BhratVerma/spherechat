@@ -15,6 +15,9 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
+// Required for Railway/Vercel proxy
+app.set('trust proxy', 1)
+
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'https://localhost:3000',
