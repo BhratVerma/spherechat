@@ -1,4 +1,3 @@
-// v2 - trust proxy fix
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
@@ -16,19 +15,12 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
-// Required for Railway/Vercel proxy
+// Trust Railway proxy
 app.set('trust proxy', 1)
-
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'https://localhost:3000',
-  'https://spherechat-kappa.vercel.app',
-  process.env.FRONTEND_URL || 'http://localhost:3000',
-]
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,
+    origin: true,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -40,16 +32,25 @@ app.use(helmet({
 }))
 
 app.use(cors({
-  origin: ALLOWED_ORIGINS,
+  origin: true,
   credentials: true,
 }))
 
 app.use(express.json())
 
-app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }))
+// Rate limiting
+app.use('/api/', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+}))
+
 app.use('/api/auth/send-otp', rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Too many OTP requests. Try again in an hour.' },
 }))
 
