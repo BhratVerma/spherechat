@@ -15,9 +15,16 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'https://localhost:3000',
+  'https://spherechat-kappa.vercel.app',
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+]
+
 const io = new Server(httpServer, {
   cors: {
-    origin: ['http://localhost:3000', 'https://localhost:3000'],
+    origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -29,13 +36,12 @@ app.use(helmet({
 }))
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://localhost:3000'],
+  origin: ALLOWED_ORIGINS,
   credentials: true,
 }))
 
 app.use(express.json())
 
-// Rate limiting
 app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }))
 app.use('/api/auth/send-otp', rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -59,7 +65,7 @@ httpServer.listen(PORT, () => {
   console.log('╚══════════════════════════════════════╝')
   console.log(`🌐  http://localhost:${PORT}`)
   console.log(`⚡  Socket.io ready`)
-  console.log(`🔗  Frontend: https://localhost:3000\n`)
+  console.log(`🔗  Frontend: ${process.env.FRONTEND_URL}\n`)
 })
 
 export { io }
