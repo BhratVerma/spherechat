@@ -5,7 +5,21 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
+    {
+      urls: 'turn:relay.metered.ca:80',
+      username: 'f43592633a53758bb23b4a3b',
+      credential: '797203b6f30b32005c256a0a9823426fe3d7',
+    },
+    {
+      urls: 'turn:relay.metered.ca:443',
+      username: 'f43592633a53758bb23b4a3b',
+      credential: '797203b6f30b32005c256a0a9823426fe3d7',
+    },
+    {
+      urls: 'turns:relay.metered.ca:443',
+      username: 'f43592633a53758bb23b4a3b',
+      credential: '797203b6f30b32005c256a0a9823426fe3d7',
+    },
   ],
 }
 
