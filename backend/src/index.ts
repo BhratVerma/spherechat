@@ -73,4 +73,4 @@ httpServer.listen(PORT, () => {
   console.log(`🔗  Frontend: ${process.env.FRONTEND_URL}\n`)
 })
 
-export { io }
+         
