@@ -45,8 +45,8 @@ export function useWebRTC(
 
     async function init() {
       try {
-        // Get camera and mic
         let localStream: MediaStream | null = null
+
         try {
           localStream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -63,7 +63,10 @@ export function useWebRTC(
         } catch (err: any) {
           console.warn('Camera failed, trying audio only:', err.name)
           try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            localStream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: false,
+            })
             setVideoError('Camera not available — voice only mode active.')
           } catch {
             setVideoError('Microphone access denied. Please allow microphone.')
@@ -72,15 +75,27 @@ export function useWebRTC(
           }
         }
 
-        if (cancelled) { localStream?.getTracks().forEach(t => t.stop()); return }
+        if (cancelled) {
+          localStream?.getTracks().forEach(t => t.stop())
+          return
+        }
 
         stream.current = localStream
         setVideoLoading(false)
 
-        // Show local video
-        if (localRef.current && localStream.getVideoTracks().length > 0) {
+        // Show local video — Chrome compatible
+        if (localRef.current) {
           localRef.current.srcObject = localStream
-          await localRef.current.play().catch(console.error)
+          localRef.current.muted = true
+          localRef.current.setAttribute('playsinline', 'true')
+          localRef.current.setAttribute('autoplay', 'true')
+          try {
+            await localRef.current.play()
+          } catch {
+            document.addEventListener('click', () => {
+              localRef.current?.play().catch(console.error)
+            }, { once: true })
+          }
         }
 
         // Create peer connection
@@ -92,12 +107,15 @@ export function useWebRTC(
           peer.addTrack(track, localStream!)
         })
 
-        // When remote stream arrives — show it
+        // When remote stream arrives
         peer.ontrack = (event) => {
           console.log('Got remote track:', event.track.kind)
           if (remoteRef.current && event.streams[0]) {
             remoteRef.current.srcObject = event.streams[0]
-            remoteRef.current.play().catch(console.error)
+            remoteRef.current.muted = false
+            try {
+              remoteRef.current.play().catch(console.error)
+            } catch {}
             setVideoConnected(true)
           }
         }
@@ -105,27 +123,34 @@ export function useWebRTC(
         // Send ICE candidates
         peer.onicecandidate = (event) => {
           if (event.candidate) {
-            socket.emit('webrtc_ice_candidate', { roomId, candidate: event.candidate })
+            socket.emit('webrtc_ice_candidate', {
+              roomId,
+              candidate: event.candidate,
+            })
           }
         }
 
         peer.oniceconnectionstatechange = () => {
           console.log('ICE state:', peer.iceConnectionState)
-          if (peer.iceConnectionState === 'connected' || peer.iceConnectionState === 'completed') {
+          if (
+            peer.iceConnectionState === 'connected' ||
+            peer.iceConnectionState === 'completed'
+          ) {
             setVideoConnected(true)
           }
           if (peer.iceConnectionState === 'failed') {
             console.error('ICE connection failed')
-            setVideoError('Connection failed. Text chat still works.')
           }
         }
 
         peer.onconnectionstatechange = () => {
           console.log('Connection state:', peer.connectionState)
-          if (peer.connectionState === 'connected') setVideoConnected(true)
+          if (peer.connectionState === 'connected') {
+            setVideoConnected(true)
+          }
         }
 
-        // Start WebRTC handshake
+        // Start handshake
         if (isInitiator) {
           const offer = await peer.createOffer({
             offerToReceiveAudio: true,
@@ -139,7 +164,9 @@ export function useWebRTC(
         socket.on('webrtc_offer', async ({ offer }) => {
           console.log('Received WebRTC offer')
           if (peer.signalingState === 'stable') {
-            await peer.setRemoteDescription(new RTCSessionDescription(offer))
+            await peer.setRemoteDescription(
+              new RTCSessionDescription(offer)
+            )
             const answer = await peer.createAnswer()
             await peer.setLocalDescription(answer)
             socket.emit('webrtc_answer', { roomId, answer })
@@ -150,14 +177,18 @@ export function useWebRTC(
         socket.on('webrtc_answer', async ({ answer }) => {
           console.log('Received WebRTC answer')
           if (peer.signalingState === 'have-local-offer') {
-            await peer.setRemoteDescription(new RTCSessionDescription(answer))
+            await peer.setRemoteDescription(
+              new RTCSessionDescription(answer)
+            )
           }
         })
 
         socket.on('webrtc_ice_candidate', async ({ candidate }) => {
           try {
             if (peer.remoteDescription) {
-              await peer.addIceCandidate(new RTCIceCandidate(candidate))
+              await peer.addIceCandidate(
+                new RTCIceCandidate(candidate)
+              )
             }
           } catch (e) {
             console.warn('ICE candidate error:', e)
@@ -187,18 +218,29 @@ export function useWebRTC(
 
   const toggleMute = useCallback(() => {
     const track = stream.current?.getAudioTracks()[0]
-    if (track) { track.enabled = !track.enabled; setMuted(!track.enabled) }
+    if (track) {
+      track.enabled = !track.enabled
+      setMuted(!track.enabled)
+    }
   }, [])
 
   const toggleCamera = useCallback(() => {
     const track = stream.current?.getVideoTracks()[0]
-    if (track) { track.enabled = !track.enabled; setCameraOff(!track.enabled) }
+    if (track) {
+      track.enabled = !track.enabled
+      setCameraOff(!track.enabled)
+    }
   }, [])
 
   return {
-    localRef, remoteRef,
-    isVideoConnected, isVideoLoading,
-    isMuted, isCameraOff, videoError,
-    toggleMute, toggleCamera,
+    localRef,
+    remoteRef,
+    isVideoConnected,
+    isVideoLoading,
+    isMuted,
+    isCameraOff,
+    videoError,
+    toggleMute,
+    toggleCamera,
   }
 }

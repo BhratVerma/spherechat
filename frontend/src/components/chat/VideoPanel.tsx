@@ -1,5 +1,4 @@
 'use client'
-import { useEffect } from 'react'
 
 interface Props {
   localRef:       React.RefObject<HTMLVideoElement>
@@ -19,33 +18,23 @@ export default function VideoPanel({
   isMuted, isCameraOff, videoError, partnerName,
   onToggleMute, onToggleCamera,
 }: Props) {
-
-  // Force play videos when refs are set
-  useEffect(() => {
-    if (localRef.current) {
-      localRef.current.onloadedmetadata = () => {
-        localRef.current?.play().catch(console.error)
-      }
-    }
-  }, [localRef])
-
-  useEffect(() => {
-    if (remoteRef.current) {
-      remoteRef.current.onloadedmetadata = () => {
-        remoteRef.current?.play().catch(console.error)
-      }
-    }
-  }, [remoteRef])
-
   return (
-    <div style={{ position: 'relative', background: '#050508', borderRadius: 16, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
+    <div style={{
+      position: 'relative',
+      background: '#050508',
+      borderRadius: 16,
+      overflow: 'hidden',
+      aspectRatio: '16/9',
+      width: '100%',
+    }}>
 
-      {/* Remote video — full size */}
+      {/* Remote video */}
       <video
         ref={remoteRef}
         autoPlay
         playsInline
         muted={false}
+        controls={false}
         style={{
           width: '100%',
           height: '100%',
@@ -53,11 +42,20 @@ export default function VideoPanel({
           display: 'block',
           background: '#050508',
         }}
+        onLoadedMetadata={(e) => {
+          const v = e.target as HTMLVideoElement
+          v.play().catch(console.error)
+        }}
       />
 
-      {/* Waiting overlay — only show when not connected */}
+      {/* Waiting overlay */}
       {!isConnected && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 20, background: '#050508' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 16, padding: 20, background: '#050508',
+        }}>
           {isLoading ? (
             <>
               <div style={{ width: 40, height: 40, border: '2px solid #6b8fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -100,13 +98,31 @@ export default function VideoPanel({
       )}
 
       {/* Local PiP */}
-      <div style={{ position: 'absolute', bottom: 70, right: 14, width: '22%', aspectRatio: '4/3', background: '#0d0d1e', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.08)' }}>
+      <div style={{
+        position: 'absolute', bottom: 70, right: 14,
+        width: '22%', aspectRatio: '4/3',
+        background: '#0d0d1e', borderRadius: 10,
+        overflow: 'hidden',
+        border: '1.5px solid rgba(255,255,255,0.08)',
+      }}>
         <video
           ref={localRef}
           autoPlay
           playsInline
           muted
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: isCameraOff ? 'none' : 'block' }}
+          controls={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: 'scaleX(-1)',
+            display: isCameraOff ? 'none' : 'block',
+          }}
+          onLoadedMetadata={(e) => {
+            const v = e.target as HTMLVideoElement
+            v.muted = true
+            v.play().catch(console.error)
+          }}
         />
         {isCameraOff && (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
@@ -116,7 +132,11 @@ export default function VideoPanel({
       </div>
 
       {/* Controls */}
-      <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 10 }}>
+      <div style={{
+        position: 'absolute', bottom: 14,
+        left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', gap: 10,
+      }}>
         <button
           onClick={onToggleMute}
           title={isMuted ? 'Unmute' : 'Mute'}
