@@ -23,18 +23,6 @@ const ICE_SERVERS = {
   ],
 }
 
-function playVideo(video: HTMLVideoElement): Promise<void> {
-  return new Promise((resolve) => {
-    if (video.readyState >= 2) {
-      video.play().then(resolve).catch(() => resolve())
-    } else {
-      video.onloadeddata = () => {
-        video.play().then(resolve).catch(() => resolve())
-      }
-    }
-  })
-}
-
 export function useWebRTC(
   roomId: string | null,
   socket: Socket,
@@ -59,14 +47,36 @@ export function useWebRTC(
       try {
         let localStream: MediaStream | null = null
 
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-            audio: { echoCancellation: true, noiseSuppression: true },
-          })
-        } catch {
+        // Try multiple camera configs — fixes HP camera timeout on Chrome
+        const videoConfigs = [
+          { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: true },
+          { video: { width: 640, height: 480 }, audio: true },
+          { video: true, audio: true },
+          { video: { facingMode: 'user' }, audio: true },
+        ]
+
+        let lastError: any = null
+
+        for (const config of videoConfigs) {
           try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            console.log('Trying camera config:', JSON.stringify(config))
+            localStream = await navigator.mediaDevices.getUserMedia(config)
+            console.log('Camera success with config:', JSON.stringify(config))
+            break
+          } catch (err) {
+            console.warn('Camera config failed:', err)
+            lastError = err
+            localStream = null
+          }
+        }
+
+        if (!localStream) {
+          console.error('All video configs failed:', lastError)
+          try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: false,
+            })
             setVideoError('Camera not available — voice only mode active.')
           } catch {
             setVideoError('Please allow camera and microphone access.')
@@ -75,60 +85,90 @@ export function useWebRTC(
           }
         }
 
-        if (cancelled) { localStream?.getTracks().forEach(t => t.stop()); return }
+        if (cancelled) {
+          localStream?.getTracks().forEach(t => t.stop())
+          return
+        }
 
         stream.current = localStream
         setVideoLoading(false)
 
-        // Attach local stream
+        // Show local video
         if (localRef.current) {
           localRef.current.srcObject = localStream
           localRef.current.muted = true
-          await playVideo(localRef.current)
+          try {
+            await localRef.current.play()
+          } catch {
+            document.addEventListener('click', () => {
+              localRef.current?.play().catch(console.error)
+            }, { once: true })
+          }
         }
 
         // Create peer connection
         const peer = new RTCPeerConnection(ICE_SERVERS)
         pc.current = peer
 
-        localStream.getTracks().forEach(track => peer.addTrack(track, localStream!))
+        localStream.getTracks().forEach(track => {
+          peer.addTrack(track, localStream!)
+        })
 
         peer.ontrack = async (event) => {
           console.log('Remote track received:', event.track.kind)
           if (remoteRef.current && event.streams[0]) {
             remoteRef.current.srcObject = event.streams[0]
-            await playVideo(remoteRef.current)
+            try {
+              await remoteRef.current.play()
+            } catch {
+              console.warn('Remote video play failed')
+            }
             setVideoConnected(true)
           }
         }
 
         peer.onicecandidate = (event) => {
           if (event.candidate) {
-            socket.emit('webrtc_ice_candidate', { roomId, candidate: event.candidate })
+            socket.emit('webrtc_ice_candidate', {
+              roomId,
+              candidate: event.candidate,
+            })
           }
         }
 
         peer.oniceconnectionstatechange = () => {
-          console.log('ICE:', peer.iceConnectionState)
-          if (['connected', 'completed'].includes(peer.iceConnectionState)) {
+          console.log('ICE state:', peer.iceConnectionState)
+          if (
+            peer.iceConnectionState === 'connected' ||
+            peer.iceConnectionState === 'completed'
+          ) {
             setVideoConnected(true)
           }
         }
 
         peer.onconnectionstatechange = () => {
-          console.log('Connection:', peer.connectionState)
-          if (peer.connectionState === 'connected') setVideoConnected(true)
+          console.log('Connection state:', peer.connectionState)
+          if (peer.connectionState === 'connected') {
+            setVideoConnected(true)
+          }
         }
 
         if (isInitiator) {
-          const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
+          const offer = await peer.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          })
           await peer.setLocalDescription(offer)
           socket.emit('webrtc_offer', { roomId, offer })
+          console.log('Sent WebRTC offer')
         }
 
         socket.on('webrtc_offer', async ({ offer }) => {
+          console.log('Received WebRTC offer')
           if (peer.signalingState === 'stable') {
-            await peer.setRemoteDescription(new RTCSessionDescription(offer))
+            await peer.setRemoteDescription(
+              new RTCSessionDescription(offer)
+            )
             const answer = await peer.createAnswer()
             await peer.setLocalDescription(answer)
             socket.emit('webrtc_answer', { roomId, answer })
@@ -136,18 +176,23 @@ export function useWebRTC(
         })
 
         socket.on('webrtc_answer', async ({ answer }) => {
+          console.log('Received WebRTC answer')
           if (peer.signalingState === 'have-local-offer') {
-            await peer.setRemoteDescription(new RTCSessionDescription(answer))
+            await peer.setRemoteDescription(
+              new RTCSessionDescription(answer)
+            )
           }
         })
 
         socket.on('webrtc_ice_candidate', async ({ candidate }) => {
           try {
             if (peer.remoteDescription) {
-              await peer.addIceCandidate(new RTCIceCandidate(candidate))
+              await peer.addIceCandidate(
+                new RTCIceCandidate(candidate)
+              )
             }
           } catch (e) {
-            console.warn('ICE error:', e)
+            console.warn('ICE candidate error:', e)
           }
         })
 
@@ -174,13 +219,29 @@ export function useWebRTC(
 
   const toggleMute = useCallback(() => {
     const track = stream.current?.getAudioTracks()[0]
-    if (track) { track.enabled = !track.enabled; setMuted(!track.enabled) }
+    if (track) {
+      track.enabled = !track.enabled
+      setMuted(!track.enabled)
+    }
   }, [])
 
   const toggleCamera = useCallback(() => {
     const track = stream.current?.getVideoTracks()[0]
-    if (track) { track.enabled = !track.enabled; setCameraOff(!track.enabled) }
+    if (track) {
+      track.enabled = !track.enabled
+      setCameraOff(!track.enabled)
+    }
   }, [])
 
-  return { localRef, remoteRef, isVideoConnected, isVideoLoading, isMuted, isCameraOff, videoError, toggleMute, toggleCamera }
+  return {
+    localRef,
+    remoteRef,
+    isVideoConnected,
+    isVideoLoading,
+    isMuted,
+    isCameraOff,
+    videoError,
+    toggleMute,
+    toggleCamera,
+  }
 }

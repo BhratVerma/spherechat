@@ -23,7 +23,6 @@ export default function VideoPanel({
 
   function handleStartCamera() {
     setUserClicked(true)
-    // Force play both videos after user interaction
     if (localRef.current) {
       localRef.current.muted = true
       localRef.current.play().catch(console.error)
@@ -35,9 +34,7 @@ export default function VideoPanel({
 
   return (
     <div
-      onClick={() => {
-        if (!userClicked) handleStartCamera()
-      }}
+      onClick={() => { if (!userClicked) handleStartCamera() }}
       style={{
         position: 'relative',
         background: '#050508',
@@ -62,27 +59,26 @@ export default function VideoPanel({
         }}
       />
 
-      {/* Click to start overlay — shown before user clicks */}
+      {/* Tap to start overlay */}
       {!userClicked && !isLoading && !videoError && (
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          gap: 12, background: 'rgba(0,0,0,0.7)',
-          zIndex: 10,
+          gap: 12, background: 'rgba(0,0,0,0.7)', zIndex: 10,
         }}>
           <p style={{ fontSize: 40 }}>📹</p>
           <p style={{ color: '#e8e8f0', fontSize: 15, fontWeight: 600 }}>
             Tap to start camera
           </p>
           <p style={{ color: '#5050a0', fontSize: 13 }}>
-            Chrome requires a tap to activate camera
+            Required by Chrome
           </p>
         </div>
       )}
 
       {/* Waiting overlay */}
-      {isConnected === false && userClicked && (
+      {!isConnected && userClicked && (
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', flexDirection: 'column',
@@ -129,7 +125,8 @@ export default function VideoPanel({
         position: 'absolute', bottom: 70, right: 14,
         width: '22%', aspectRatio: '4/3',
         background: '#0d0d1e', borderRadius: 10,
-        overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+        border: '1.5px solid rgba(255,255,255,0.08)',
       }}>
         <video
           ref={localRef}
@@ -144,18 +141,28 @@ export default function VideoPanel({
           }}
         />
         {isCameraOff && (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📷</div>
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+            📷
+          </div>
         )}
       </div>
 
       {/* Controls */}
-      <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 10 }}>
-        <button onClick={(e) => { e.stopPropagation(); onToggleMute() }}
-          style={{ width: 44, height: 44, borderRadius: '50%', background: isMuted ? 'rgba(252,92,101,0.8)' : 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', fontSize: 18 }}>
+      <div style={{
+        position: 'absolute', bottom: 14,
+        left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', gap: 10,
+      }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleMute() }}
+          style={{ width: 44, height: 44, borderRadius: '50%', background: isMuted ? 'rgba(252,92,101,0.8)' : 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', fontSize: 18 }}
+        >
           {isMuted ? '🔇' : '🎤'}
         </button>
-        <button onClick={(e) => { e.stopPropagation(); onToggleCamera() }}
-          style={{ width: 44, height: 44, borderRadius: '50%', background: isCameraOff ? 'rgba(252,92,101,0.8)' : 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', fontSize: 18 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleCamera() }}
+          style={{ width: 44, height: 44, borderRadius: '50%', background: isCameraOff ? 'rgba(252,92,101,0.8)' : 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', fontSize: 18 }}
+        >
           {isCameraOff ? '📷' : '📹'}
         </button>
       </div>
